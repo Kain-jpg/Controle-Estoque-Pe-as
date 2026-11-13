@@ -1,0 +1,371 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Lista de Alunos - Linguagem de Programação I</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        }
+
+        h1, h2 {
+            color: #333;
+        }
+
+        form {
+            max-width: 500px;
+            margin-bottom: 25px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+
+        label {
+            display: block;
+            margin-top: 8px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 7px;
+            margin-top: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            margin-top: 15px;
+            padding: 8px 15px;
+            cursor: pointer;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Alunos cadastrados - Linguagem de Programação I</h1>
+
+    <h2 id="titulo-formulario">Cadastrar novo aluno</h2>
+
+    <form id="form-aluno">
+
+        <!-- Campo oculto que guarda o ID do aluno -->
+        <input type="hidden" id="id_aluno" value="">
+
+        <label for="matricula">Matrícula:</label>
+        <input type="text" id="matricula" required>
+
+        <label for="nome">Nome:</label>
+        <input type="text" id="nome" required>
+
+        <label for="cpf">CPF:</label>
+        <input type="text" id="cpf" required>
+
+        <label for="celular">Celular:</label>
+        <input type="text" id="celular" required>
+
+        <label for="curso">Curso:</label>
+        <input type="text" id="curso" required>
+
+        <button type="submit" id="botao-salvar">
+            Cadastrar aluno
+        </button>
+
+        <button type="button" id="botao-cancelar" style="display:none">
+            Cancelar edição
+        </button>
+
+    </form>
+
+    <div id="mensagem">Carregando alunos...</div>
+
+    <h2>Lista de alunos</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Matrícula</th>
+                <th>Nome</th>
+                <th>CPF</th>
+                <th>Celular</th>
+                <th>Curso</th>
+                <th>Ação</th>
+            </tr>
+        </thead>
+
+        <tbody id="alunos-body"></tbody>
+    </table>
+
+    <script>
+
+        
+// MONTA A TABELA
+function montarPaginaAlunos(rows) {
+
+    const tbody = document.getElementById('alunos-body');
+
+    tbody.innerHTML = '';
+
+    if (!rows || rows.length === 0) {
+        tbody.innerHTML =
+            '<tr><td colspan="7">Nenhum aluno cadastrado.</td></tr>';
+        return;
+    }
+
+    rows.forEach(a => {
+
+        const tr = document.createElement('tr');
+
+        [a.id, a.matricula, a.nome, a.cpf, a.celular, a.curso]
+            .forEach(valor => {
+
+                const td = document.createElement('td');
+                td.textContent = valor ?? '';
+                tr.appendChild(td);
+
+            });
+
+        // Botão para editar o aluno
+        const tdAcao = document.createElement('td');
+
+        const botaoEditar = document.createElement('button');
+
+        botaoEditar.textContent = 'Editar';
+
+        botaoEditar.addEventListener('click', () => {
+            editarAluno(a);
+        });
+
+        tdAcao.appendChild(botaoEditar);
+
+        // Botão para excluir o aluno
+        const botaoExcluir = document.createElement('button');
+
+        botaoExcluir.textContent = 'Excluir';
+
+        botaoExcluir.addEventListener('click', () => {
+            excluirAluno(a.id);
+        });
+
+        tdAcao.appendChild(botaoExcluir);
+
+        tr.appendChild(tdAcao);
+
+        tbody.appendChild(tr);
+
+    });
+}
+
+
+async function excluirAluno(id) {
+
+    // Confirma se deseja excluir
+    if (!confirm('Tem certeza que deseja excluir este aluno?')) {
+        return;
+    }
+
+    try {
+
+        // Envia a requisição para o servidor
+        const resposta = await fetch('/api/alunos/' + id, {
+            method: 'DELETE'
+        });
+
+        const resultado = await resposta.json();
+
+        if (!resposta.ok) {
+            throw new Error(resultado.erro || 'Erro ao excluir aluno.');
+        }
+
+        // Exibe mensagem
+        alert(resultado.mensagem);
+
+        // Atualiza a tabela
+        await carregarAlunos();
+
+    } catch (erro) {
+
+        alert('Erro ao excluir aluno: ' + erro.message);
+
+    }
+}
+
+
+        // BUSCA OS ALUNOS
+        async function carregarAlunos() {
+
+            const mensagem = document.getElementById('mensagem');
+
+            try {
+
+                const resposta = await fetch('/api/alunos');
+
+                if (!resposta.ok) {
+                    throw new Error('Erro HTTP: ' + resposta.status);
+                }
+
+                const alunos = await resposta.json();
+
+                montarPaginaAlunos(alunos);
+
+                mensagem.textContent =
+                    'Alunos carregados: ' + alunos.length;
+
+            } catch (erro) {
+
+                mensagem.textContent =
+                    'Erro ao carregar alunos: ' + erro.message;
+
+                console.error(erro);
+            }
+        }
+
+        // PREENCHE O FORMULÁRIO PARA EDIÇÃO
+        function editarAluno(aluno) {
+
+            document.getElementById('id_aluno').value = aluno.id;
+
+            document.getElementById('matricula').value = aluno.matricula;
+            document.getElementById('nome').value = aluno.nome;
+            document.getElementById('cpf').value = aluno.cpf;
+            document.getElementById('celular').value = aluno.celular;
+            document.getElementById('curso').value = aluno.curso;
+
+            document.getElementById('titulo-formulario').textContent =
+                'Alterar dados do aluno';
+
+            document.getElementById('botao-salvar').textContent =
+                'Salvar alterações';
+
+            document.getElementById('botao-cancelar').style.display =
+                'inline-block';
+        }
+
+        // CANCELA A EDIÇÃO
+        function cancelarEdicao() {
+
+            document.getElementById('id_aluno').value = '';
+
+            document.getElementById('form-aluno').reset();
+
+            document.getElementById('titulo-formulario').textContent =
+                'Cadastrar novo aluno';
+
+            document.getElementById('botao-salvar').textContent =
+                'Cadastrar aluno';
+
+            document.getElementById('botao-cancelar').style.display =
+                'none';
+        }
+
+        document.getElementById('botao-cancelar')
+            .addEventListener('click', cancelarEdicao);
+
+        // CADASTRA OU ALTERA O ALUNO
+        document.getElementById('form-aluno')
+            .addEventListener('submit', async (evento) => {
+
+                evento.preventDefault();
+
+                const mensagem = document.getElementById('mensagem');
+
+                const aluno = {
+
+                    matricula: document.getElementById('matricula').value,
+                    nome: document.getElementById('nome').value,
+                    cpf: document.getElementById('cpf').value,
+                    celular: document.getElementById('celular').value,
+                    curso: document.getElementById('curso').value
+
+                };
+
+                try {
+
+                    let resposta;
+
+                    // Verifica se existe um ID no campo oculto
+                    const idAluno = document.getElementById('id_aluno').value;
+
+                    if (idAluno !== '') {
+
+                        // ALTERA O ALUNO
+                        resposta = await fetch(
+                            '/api/alunos/' + idAluno,
+                            {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify(aluno)
+                            }
+                        );
+
+                    } else {
+
+                        // CADASTRA UM NOVO ALUNO
+                        resposta = await fetch('/api/alunos', {
+
+                            method: 'POST',
+
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+
+                            body: JSON.stringify(aluno)
+
+                        });
+                    }
+
+                    const resultado = await resposta.json();
+
+                    if (!resposta.ok) {
+                        throw new Error(
+                            resultado.erro || 'Erro ao salvar aluno.'
+                        );
+                    }
+
+                    mensagem.textContent =
+                        resultado.mensagem || 'Operação realizada com sucesso!';
+
+                    cancelarEdicao();
+
+                    await carregarAlunos();
+
+                } catch (erro) {
+
+                    mensagem.textContent =
+                        'Erro ao salvar aluno: ' + erro.message;
+
+                    console.error(erro);
+                }
+
+            });
+
+        // CARREGA OS ALUNOS AO ABRIR A PÁGINA
+        document.addEventListener('DOMContentLoaded', carregarAlunos);
+
+    </script>
+
+</body>
+</html>
