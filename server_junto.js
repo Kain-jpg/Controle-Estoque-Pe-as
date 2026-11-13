@@ -41,8 +41,8 @@ const server = http.createServer(async (req, res) => {
 
     const { pathname } = url.parse(req.url, true);
 
-    // Identifica o ID do aluno pela URL
-    const idAluno = pathname && pathname.startsWith('/api/alunos/')
+    // Identifica o ID do item pela URL
+    const idItem = pathname && pathname.startsWith('/api/itens/')
         ? Number(pathname.split('/')[3])
         : null;
 
@@ -73,15 +73,15 @@ const server = http.createServer(async (req, res) => {
             }
         );
 
-    // ROTA 2: Consulta os alunos no banco de dados
+    // ROTA 2: Consulta os itens no banco de dados
     } else if (
         req.method === 'GET' &&
-        pathname === '/api/alunos'
+        pathname === '/api/itens'
     ) {
         try {
             const [rows] = await pool.query(
-                `SELECT id, matricula, nome, cpf, celular, curso
-                 FROM alunos
+                `SELECT id, descricao, quantidade, preco
+                 FROM itens
                  ORDER BY id`
             );
 
@@ -91,41 +91,37 @@ const server = http.createServer(async (req, res) => {
             console.error(err);
 
             enviarJSON(res, 500, {
-                erro: 'Erro ao buscar alunos: ' + err.message
+                erro: 'Erro ao buscar itens: ' + err.message
             });
         }
 
-    // ROTA 3: Cadastra um novo aluno
+    // ROTA 3: Cadastra um novo item
     } else if (
         req.method === 'POST' &&
-        pathname === '/api/alunos'
+        pathname === '/api/itens'
     ) {
         try {
-            const aluno = await lerCorpo(req);
+            const item = await lerCorpo(req);
 
-            const { matricula, nome, cpf, celular, curso } = aluno;
+            const { descricao, quantidade, preco } = item;
 
-            const campos = [matricula, nome, cpf, celular, curso];
-
-            if (campos.some(valor =>
-                valor === undefined ||
-                valor === null ||
-                String(valor).trim() === ''
-            )) {
+            if (typeof descricao !== 'string' || descricao.trim() === '' ||
+                !Number.isInteger(Number(quantidade)) ||
+                Number(quantidade) < 0 || !Number.isFinite(Number(preco)) ||
+                Number(preco) < 0) {
                 return enviarJSON(res, 400, {
-                    erro: 'Todos os campos são obrigatórios.'
+                    erro: 'Informe descrição, quantidade inteira não negativa e preço válido.'
                 });
             }
 
             const [resultado] = await pool.query(
-                `INSERT INTO alunos
-                (matricula, nome, cpf, celular, curso)
-                VALUES (?, ?, ?, ?, ?)`,
-                [matricula, nome, cpf, celular, curso]
+                `INSERT INTO itens (descricao, quantidade, preco)
+                 VALUES (?, ?, ?)`,
+                [descricao.trim(), Number(quantidade), Number(preco)]
             );
 
             enviarJSON(res, 201, {
-                mensagem: 'Aluno cadastrado com sucesso!',
+                mensagem: 'Item cadastrado com sucesso!',
                 id: resultado.insertId
             });
 
@@ -139,60 +135,63 @@ const server = http.createServer(async (req, res) => {
             }
 
             enviarJSON(res, 500, {
-                erro: 'Erro ao cadastrar aluno: ' + err.message
+                erro: 'Erro ao cadastrar item: ' + err.message
             });
         }
 
-    // ROTA 4: Alterar aluno
+    // ROTA 4: Movimentar o estoque
     } else if (
-        req.method === 'PUT' &&
-        idAluno !== null
+        req.method === 'POST' &&
+        pathname && pathname.endsWith('/movimentacoes') &&
+        idItem !== null
     ) {
         try {
-            if (!Number.isInteger(idAluno) || idAluno <= 0) {
+            if (!Number.isInteger(idItem) || idItem <= 0) {
                 return enviarJSON(res, 400, {
-                    erro: 'ID do aluno inválido.'
+                    erro: 'ID do item inválido.'
                 });
             }
 
-            const aluno = await lerCorpo(req);
+            const movimentacao = await lerCorpo(req);
+            const { tipo, quantidade } = movimentacao;
 
-            const { matricula, nome, cpf, celular, curso } = aluno;
-
-            const campos = [matricula, nome, cpf, celular, curso];
-
-            if (campos.some(valor =>
-                valor === undefined ||
-                valor === null ||
-                String(valor).trim() === ''
-            )) {
+            if (!['entrada', 'saida'].includes(tipo) ||
+                !Number.isInteger(Number(quantidade)) || Number(quantidade) <= 0) {
                 return enviarJSON(res, 400, {
-                    erro: 'Todos os campos são obrigatórios.'
+                    erro: 'Tipo inválido ou quantidade inválida. Informe entrada/saida e uma quantidade inteira maior que zero.'
                 });
             }
 
-            // Verifica se o aluno existe
-            const [alunos] = await pool.query(
-                'SELECT id FROM alunos WHERE id = ?',
-                [idAluno]
+            const operador = tipo === 'entrada' ? '+' : '-';
+            const condicaoSaldo = tipo === 'saida' ? ' AND quantidade >= ?' : '';
+            const parametros = tipo === 'saida'
+                ? [Number(quantidade), idItem, Number(quantidade)]
+                : [Number(quantidade), idItem];
+
+            const [resultado] = await pool.query(
+                `UPDATE itens SET quantidade = quantidade ${operador} ?
+                 WHERE id = ?${condicaoSaldo}`,
+                parametros
             );
 
-            if (alunos.length === 0) {
-                return enviarJSON(res, 404, {
-                    erro: 'Aluno não encontrado.'
+            if (resultado.affectedRows === 0) {
+                const [itens] = await pool.query(
+                    'SELECT id, quantidade FROM itens WHERE id = ?',
+                    [idItem]
+                );
+
+                if (itens.length === 0) {
+                    return enviarJSON(res, 404, { erro: 'Item não encontrado.' });
+                }
+
+                return enviarJSON(res, 409, {
+                    erro: 'Estoque insuficiente para realizar a saída.'
                 });
             }
 
-            // Atualiza os dados do aluno
-            await pool.query(
-                `UPDATE alunos
-                 SET matricula = ?, nome = ?, cpf = ?, celular = ?, curso = ?
-                 WHERE id = ?`,
-                [matricula, nome, cpf, celular, curso, idAluno]
-            );
-
+            const operacao = tipo === 'entrada' ? 'Entrada' : 'Saída';
             enviarJSON(res, 200, {
-                mensagem: 'Aluno alterado com sucesso!'
+                mensagem: `${operacao} de ${Number(quantidade)} unidade(s) registrada com sucesso.`
             });
 
         } catch (err) {
@@ -205,50 +204,110 @@ const server = http.createServer(async (req, res) => {
             }
 
             enviarJSON(res, 500, {
-                erro: 'Erro ao alterar aluno: ' + err.message
+                erro: 'Erro ao movimentar estoque: ' + err.message
             });
         }
 
-    // ROTA 5: Excluir aluno
+    // ROTA 5: Alterar item
     } else if (
-        req.method === 'DELETE' &&
-        idAluno !== null
+        req.method === 'PUT' &&
+        idItem !== null
     ) {
         try {
-            // Verifica se o ID é válido
-            if (!Number.isInteger(idAluno) || idAluno <= 0) {
+            if (!Number.isInteger(idItem) || idItem <= 0) {
                 return enviarJSON(res, 400, {
-                    erro: 'ID do aluno inválido.'
+                    erro: 'ID do item inválido.'
                 });
             }
 
-            // Verifica se o aluno existe
-            const [alunos] = await pool.query(
-                'SELECT id FROM alunos WHERE id = ?',
-                [idAluno]
+            const item = await lerCorpo(req);
+            const { descricao, quantidade, preco } = item;
+
+            if (typeof descricao !== 'string' || descricao.trim() === '' ||
+                !Number.isInteger(Number(quantidade)) ||
+                Number(quantidade) < 0 || !Number.isFinite(Number(preco)) ||
+                Number(preco) < 0) {
+                return enviarJSON(res, 400, {
+                    erro: 'Informe descrição, quantidade inteira não negativa e preço válido.'
+                });
+            }
+
+            const [itens] = await pool.query(
+                'SELECT id FROM itens WHERE id = ?',
+                [idItem]
             );
 
-            if (alunos.length === 0) {
+            if (itens.length === 0) {
                 return enviarJSON(res, 404, {
-                    erro: 'Aluno não encontrado.'
+                    erro: 'Item não encontrado.'
                 });
             }
 
-            // Exclui o aluno do banco de dados
             await pool.query(
-                'DELETE FROM alunos WHERE id = ?',
-                [idAluno]
+                `UPDATE itens
+                 SET descricao = ?, quantidade = ?, preco = ?
+                 WHERE id = ?`,
+                [descricao.trim(), Number(quantidade), Number(preco), idItem]
             );
 
             enviarJSON(res, 200, {
-                mensagem: 'Aluno excluído com sucesso!'
+                mensagem: 'Item alterado com sucesso!'
+            });
+
+        } catch (err) {
+            console.error(err);
+
+            if (err.message === 'JSON inválido') {
+                return enviarJSON(res, 400, {
+                    erro: 'Os dados enviados não são um JSON válido.'
+                });
+            }
+
+            enviarJSON(res, 500, {
+                erro: 'Erro ao alterar item: ' + err.message
+            });
+        }
+
+    // ROTA 6: Excluir item
+    } else if (
+        req.method === 'DELETE' &&
+        idItem !== null
+    ) {
+        try {
+            // Verifica se o ID é válido
+            if (!Number.isInteger(idItem) || idItem <= 0) {
+                return enviarJSON(res, 400, {
+                    erro: 'ID do item inválido.'
+                });
+            }
+
+            // Verifica se o item existe
+            const [itens] = await pool.query(
+                'SELECT id FROM itens WHERE id = ?',
+                [idItem]
+            );
+
+            if (itens.length === 0) {
+                return enviarJSON(res, 404, {
+                    erro: 'Item não encontrado.'
+                });
+            }
+
+            // Exclui o item do banco de dados
+            await pool.query(
+                'DELETE FROM itens WHERE id = ?',
+                [idItem]
+            );
+
+            enviarJSON(res, 200, {
+                mensagem: 'Item excluído com sucesso!'
             });
 
         } catch (err) {
             console.error(err);
 
             enviarJSON(res, 500, {
-                erro: 'Erro ao excluir aluno: ' + err.message
+                erro: 'Erro ao excluir item: ' + err.message
             });
         }
 
