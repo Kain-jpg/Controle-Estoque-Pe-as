@@ -97,6 +97,10 @@
 
     <h2>Lista de itens</h2>
 
+    <label for="termo-pesquisa">Buscar por ID ou descrição:</label>
+    <input type="search" id="termo-pesquisa" placeholder="Digite o ID ou a descrição">
+    <button type="button" id="botao-pesquisar">Pesquisar</button>
+
     <table>
         <thead>
             <tr>
@@ -114,6 +118,32 @@
     <script>
 
         
+let itensCarregados = [];
+
+function pesquisarItens() {
+    const termo = document.getElementById('termo-pesquisa').value
+        .trim()
+        .toLocaleLowerCase('pt-BR');
+
+    const resultado = itensCarregados.filter(item =>
+        String(item.id).includes(termo) ||
+        String(item.descricao).toLocaleLowerCase('pt-BR').includes(termo)
+    );
+
+    montarPaginaItens(resultado);
+}
+
+document.getElementById('botao-pesquisar')
+    .addEventListener('click', pesquisarItens);
+
+document.getElementById('termo-pesquisa')
+    .addEventListener('keydown', evento => {
+        if (evento.key === 'Enter') {
+            evento.preventDefault();
+            pesquisarItens();
+        }
+    });
+
 // MONTA A TABELA
 function montarPaginaItens(rows) {
 
@@ -264,8 +294,9 @@ async function excluirItem(id) {
                 }
 
                 const itens = await resposta.json();
+                itensCarregados = itens;
 
-                montarPaginaItens(itens);
+                pesquisarItens();
 
                 mensagem.textContent =
                     'Itens carregados: ' + itens.length;
