@@ -19,7 +19,7 @@ Sistema desenvolvido para facilitar cadastro, a consulta e o gerenciamento efici
 
 ## Configuração do banco
 
-O servidor usa o banco `banco_estoque` e a tabela `itens`. Crie a estrutura no MySQL antes de iniciar:
+O servidor usa o banco `banco_estoque` e a tabela `itens`. O ID do item é informado no formulário e deve ser único. Crie a estrutura no MySQL antes de iniciar:
 
 ```sql
 CREATE DATABASE banco_estoque;

@@ -103,9 +103,10 @@ const server = http.createServer(async (req, res) => {
         try {
             const item = await lerCorpo(req);
 
-            const { descricao, quantidade, preco } = item;
+            const { id, descricao, quantidade, preco } = item;
 
-            if (typeof descricao !== 'string' || descricao.trim() === '' ||
+            if (!Number.isInteger(Number(id)) || Number(id) <= 0 ||
+                typeof descricao !== 'string' || descricao.trim() === '' ||
                 !Number.isInteger(Number(quantidade)) ||
                 Number(quantidade) < 0 || !Number.isFinite(Number(preco)) ||
                 Number(preco) < 0) {
@@ -115,9 +116,9 @@ const server = http.createServer(async (req, res) => {
             }
 
             const [resultado] = await pool.query(
-                `INSERT INTO itens (descricao, quantidade, preco)
-                 VALUES (?, ?, ?)`,
-                [descricao.trim(), Number(quantidade), Number(preco)]
+                `INSERT INTO itens (id, descricao, quantidade, preco)
+                 VALUES (?, ?, ?, ?)`,
+                [Number(id), descricao.trim(), Number(quantidade), Number(preco)]
             );
 
             enviarJSON(res, 201, {
@@ -127,6 +128,12 @@ const server = http.createServer(async (req, res) => {
 
         } catch (err) {
             console.error(err);
+
+            if (err.code === 'ER_DUP_ENTRY') {
+                return enviarJSON(res, 409, {
+                    erro: 'Já existe um item cadastrado com esse ID.'
+                });
+            }
 
             if (err.message === 'JSON inválido') {
                 return enviarJSON(res, 400, {
@@ -221,9 +228,10 @@ const server = http.createServer(async (req, res) => {
             }
 
             const item = await lerCorpo(req);
-            const { descricao, quantidade, preco } = item;
+            const { id, descricao, quantidade, preco } = item;
 
-            if (typeof descricao !== 'string' || descricao.trim() === '' ||
+            if (Number(id) !== idItem ||
+                typeof descricao !== 'string' || descricao.trim() === '' ||
                 !Number.isInteger(Number(quantidade)) ||
                 Number(quantidade) < 0 || !Number.isFinite(Number(preco)) ||
                 Number(preco) < 0) {

@@ -69,8 +69,10 @@
 
     <form id="form-item">
 
-        <!-- Campo oculto que guarda o ID do item -->
-        <input type="hidden" id="id_item" value="">
+        <input type="hidden" id="id_item_edicao" value="">
+
+        <label for="id_item">ID do item:</label>
+        <input type="number" id="id_item" min="1" step="1" required>
 
         <label for="descricao">Descrição:</label>
         <input type="text" id="descricao" required>
@@ -280,7 +282,9 @@ async function excluirItem(id) {
         // PREENCHE O FORMULÁRIO PARA EDIÇÃO
         function editarItem(item) {
 
+            document.getElementById('id_item_edicao').value = item.id;
             document.getElementById('id_item').value = item.id;
+            document.getElementById('id_item').disabled = true;
 
             document.getElementById('descricao').value = item.descricao;
             document.getElementById('quantidade').value = item.quantidade;
@@ -299,9 +303,10 @@ async function excluirItem(id) {
         // CANCELA A EDIÇÃO
         function cancelarEdicao() {
 
-            document.getElementById('id_item').value = '';
+            document.getElementById('id_item_edicao').value = '';
 
             document.getElementById('form-item').reset();
+            document.getElementById('id_item').disabled = false;
 
             document.getElementById('titulo-formulario').textContent =
                 'Cadastrar novo item';
@@ -326,6 +331,7 @@ async function excluirItem(id) {
 
                 const item = {
 
+                    id: Number(document.getElementById('id_item').value),
                     descricao: document.getElementById('descricao').value,
                     quantidade: document.getElementById('quantidade').value,
                     preco: document.getElementById('preco').value
@@ -335,8 +341,8 @@ async function excluirItem(id) {
 
                     let resposta;
 
-                    // Verifica se existe um ID no campo oculto
-                    const idItem = document.getElementById('id_item').value;
+                    // Verifica se existe um ID no campo oculto de edição
+                    const idItem = document.getElementById('id_item_edicao').value;
 
                     if (idItem !== '') {
 
