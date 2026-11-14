@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Controle de estoque</title>
+    <link rel="stylesheet" href="/stylesheets/style.css">
+</head>
+<body>
+    <main class="container">
+        <header>
+            <p class="eyebrow">Controle de estoque</p>
+            <h1>Itens cadastrados</h1>
+        </header>
+
+        <% if (erro) { %>
+            <p class="notice notice-error"><%= erro %></p>
+        <% } %>
+        <% if (mensagem) { %>
+            <p class="notice"><%= mensagem %></p>
+        <% } %>
+
+        <section aria-labelledby="form-title">
+            <h2 id="form-title"><%= itemEdicao ? 'Editar item' : 'Cadastrar item' %></h2>
+            <form method="post" action="<%= itemEdicao ? `/itens/${itemEdicao.id}/editar` : '/itens' %>" class="item-form">
+                <label for="descricao">Descrição</label>
+                <input id="descricao" name="descricao" type="text" maxlength="255" required value="<%= valores.descricao || '' %>">
+
+                <label for="categoria">Categoria</label>
+                <input id="categoria" name="categoria" type="text" maxlength="120" required value="<%= valores.categoria || '' %>">
+
+                <label for="quantidade">Quantidade</label>
+                <input id="quantidade" name="quantidade" type="number" min="0" step="1" required value="<%= valores.quantidade ?? '' %>">
+
+                <label for="preco">Preço</label>
+                <input id="preco" name="preco" type="number" min="0" step="0.01" required value="<%= valores.preco ?? '' %>">
+
+                <label for="localizacao">Localização</label>
+                <input id="localizacao" name="localizacao" type="text" maxlength="150" required value="<%= valores.localizacao || '' %>">
+
+                <div class="form-actions">
+                    <button type="submit"><%= itemEdicao ? 'Salvar alterações' : 'Cadastrar item' %></button>
+                    <% if (itemEdicao) { %>
+                        <a class="button-secondary" href="/itens">Cancelar edição</a>
+                    <% } %>
+                </div>
+            </form>
+        </section>
+
+        <section aria-labelledby="list-title">
+            <div class="section-heading">
+                <h2 id="list-title">Estoque</h2>
+                <form method="get" action="/itens" class="search-form">
+                    <label class="visually-hidden" for="q">Buscar itens</label>
+                    <input id="q" name="q" type="search" value="<%= busca %>" placeholder="ID, descrição, categoria ou localização">
+                    <button type="submit">Pesquisar</button>
+                </form>
+            </div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Descrição</th>
+                            <th>Categoria</th>
+                            <th>Quantidade</th>
+                            <th>Preço</th>
+                            <th>Localização</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (itens.length === 0) { %>
+                            <tr><td colspan="7"><%= busca ? 'Nenhum item encontrado.' : 'Nenhum item cadastrado.' %></td></tr>
+                        <% } %>
+                        <% itens.forEach(item => { %>
+                            <tr>
+                                <td><%= item.id %></td>
+                                <td><%= item.descricao %></td>
+                                <td><%= item.categoria %></td>
+                                <td><%= item.quantidade %></td>
+                                <td>R$ <%= Number(item.preco).toFixed(2) %></td>
+                                <td><%= item.localizacao %></td>
+                                <td class="actions-cell">
+                                    <a class="small-link" href="/itens/<%= item.id %>/editar">Editar</a>
+                                    <form method="post" action="/itens/<%= item.id %>/movimentacoes" class="movement-form">
+                                        <label class="visually-hidden" for="quantidade-<%= item.id %>">Quantidade da movimentação</label>
+                                        <input id="quantidade-<%= item.id %>" name="quantidade" type="number" min="1" step="1" required placeholder="Qtd.">
+                                        <button name="tipo" value="entrada" type="submit">Entrada</button>
+                                        <button name="tipo" value="saida" type="submit">Saída</button>
+                                    </form>
+                                    <form method="post" action="/itens/<%= item.id %>/excluir" onsubmit="return confirm('Excluir este item?')">
+                                        <button class="button-danger" type="submit">Excluir</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
